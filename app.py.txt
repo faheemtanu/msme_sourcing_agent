@@ -1,0 +1,107 @@
+import streamlit as st
+import pandas as pd
+
+# -------------------------------
+# 🧭 Page Setup
+# -------------------------------
+st.set_page_config(page_title="MSME Sourcing Agent", layout="wide")
+st.title("🔍 MSME Sourcing Agent")
+st.markdown("Empowering MSMEs with verified supplier discovery. Upload your sourcing request or use sample data.")
+
+# -------------------------------
+# 🔁 Sample Fallback Data
+# -------------------------------
+sample_data = {
+    "Supplier Name": ["Global Traders", "EcoPack Solutions", "SteelHub India"],
+    "Product": ["Packaging", "Packaging", "Steel"],
+    "HS Code": ["4819", "4819", "7208"],
+    "Location": ["Hyderabad", "Mumbai", "Chennai"],
+    "Contact": ["info@globaltraders.com", "sales@ecopack.in", "support@steelhub.co.in"],
+    "Phone": ["9876543210", "9123456780", "9988776655"],
+    "Lead Time (days)": [7, 5, 10],
+    "MOQ": [100, 50, 500],
+    "Rating": [4.5, 4.2, 4.8],
+}
+fallback_df = pd.DataFrame(sample_data)
+
+# ✅ Verified supplier tagging
+verified_suppliers = ["Global Traders", "SteelHub India"]
+fallback_df["Verified"] = fallback_df["Supplier Name"].isin(verified_suppliers)
+
+# -------------------------------
+# 📤 CSV Upload
+# -------------------------------
+uploaded_file = st.file_uploader("📤 Upload your sourcing request CSV", type=["csv"])
+
+if uploaded_file:
+    try:
+        df = pd.read_csv(uploaded_file)
+        st.success("✅ File uploaded successfully.")
+        # Ensure required columns exist
+        required_cols = fallback_df.columns.tolist()
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            st.warning(f"⚠️ Missing columns in uploaded file: {missing_cols}. Using fallback sample data.")
+            df = fallback_df.copy()
+        else:
+            df["Verified"] = df["Supplier Name"].isin(verified_suppliers)
+    except Exception as e:
+        st.error(f"❌ Error reading file: {e}")
+        df = fallback_df.copy()
+        st.warning("Using fallback sample data instead.")
+else:
+    df = fallback_df.copy()
+
+# -------------------------------
+# 📄 Sample CSV Download
+# -------------------------------
+sample_csv = fallback_df.to_csv(index=False).encode("utf-8")
+st.download_button("📄 Download Sample CSV", sample_csv, "sample_suppliers.csv", "text/csv")
+
+# -------------------------------
+# 🔍 Filtering UI
+# -------------------------------
+st.subheader("🔎 Filter Suppliers")
+
+col1, col2, col3 = st.columns(3)
+product_filter = col1.selectbox("Product", ["All"] + sorted(df["Product"].dropna().unique()))
+location_filter = col2.selectbox("Location", ["All"] + sorted(df["Location"].dropna().unique()))
+hs_filter = col3.selectbox("HS Code", ["All"] + sorted(df["HS Code"].dropna().astype(str).unique()))
+
+filtered_df = df.copy()
+if product_filter != "All":
+    filtered_df = filtered_df[filtered_df["Product"] == product_filter]
+if location_filter != "All":
+    filtered_df = filtered_df[filtered_df["Location"] == location_filter]
+if hs_filter != "All":
+    filtered_df = filtered_df[filtered_df["HS Code"].astype(str) == hs_filter]
+
+# -------------------------------
+# 📊 Summary Metrics
+# -------------------------------
+st.subheader("📊 Summary")
+colA, colB, colC = st.columns(3)
+colA.metric("Total Suppliers", len(df))
+colB.metric("Filtered Suppliers", len(filtered_df))
+colC.metric("Verified Suppliers", filtered_df["Verified"].sum())
+
+# -------------------------------
+# 📇 Display Filtered Table
+# -------------------------------
+st.subheader("📋 Supplier List")
+st.dataframe(filtered_df[[
+    "Supplier Name", "Product", "HS Code", "Location", "Contact", "Phone",
+    "Lead Time (days)", "MOQ", "Rating", "Verified"
+]])
+
+# -------------------------------
+# 📥 Export Filtered Results
+# -------------------------------
+export_csv = filtered_df.to_csv(index=False).encode("utf-8")
+st.download_button("📥 Export Filtered Suppliers", export_csv, "filtered_suppliers.csv", "text/csv")
+
+# -------------------------------
+# 📱 Footer
+# -------------------------------
+st.markdown("---")
+st.markdown("Made for MSMEs • No login required • Publicly deployable on Streamlit Cloud or Hugging Face Spaces")
